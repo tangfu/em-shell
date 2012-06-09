@@ -1,4 +1,4 @@
-#include "shell.h"
+#include "em-shell.h"
 #include "atomic.h"
 #include <stdio.h>
 #include <stdlib.h>

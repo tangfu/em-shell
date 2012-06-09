@@ -6,7 +6,7 @@
  *    Description:  shell库的单元测试
  *
  *        Version:  1.0
- *        Created:  2011年05月13日 08时48分27秒
+ *        Created:  2012年06月09日 08时48分27秒
  *       Revision:  none
  *       Compiler:  gcc
  *
@@ -17,7 +17,7 @@
  */
 
 #include <stdio.h>
-#include "shell.h"
+#include "em-shell.h"
 #include <stdarg.h>
 #include <setjmp.h>
 #include <cmockery.h>
@@ -56,11 +56,3 @@ int main( int argc, char *argv[] )
         };
         return run_tests( TESTS );
 }
-
-/**
- * @example test.c
- *
- *	这是一个单元测试文件，可以看出使用库的方法
- *
- */
-

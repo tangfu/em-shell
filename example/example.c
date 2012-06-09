@@ -1,4 +1,4 @@
-#include "shell.h"
+#include "em-shell.h"
 #include <pthread.h>
 #include <unistd.h>
 #include <stdio.h>

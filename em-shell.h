@@ -1,7 +1,7 @@
 /**
- * @file shell.h
- * @brief  
- *  
+ * @file em-shell.h
+ * @brief
+ *
  *	一个可以嵌入软件中的shell库
  *
  * @author tangfu - abctangfuqiang2008@163.com
