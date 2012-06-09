@@ -21,7 +21,8 @@
 
 #define CMD_FILENAME_LEN 512
 #define CMD_OBJ_NUM 128
-#define CMD_STR_LEN 128
+#define CMD_STR_LEN 64
+#define CMD_INFO_LEN 128
 #define CMD_HISTORY_LEN	15
 #define CMD_BUFFER_LEN 1024			/** standard xterm 80*24 */
 #define MAX_PATCH_NUMBER	200
@@ -62,6 +63,7 @@ enum cmd_type_s {INNER_CMD, EXTERN_CMD, UNKNOWN_CMD};
 
 struct __CMD_OBJ {
         char	CmdStr[CMD_STR_LEN];
+        char	*CmdInfo;
         void	( *CmdHandler )( CMD_OBJ *cmd, const char *option );
         void 	*param;
 };

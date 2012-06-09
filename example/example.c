@@ -43,7 +43,7 @@ int main()
         pthread_attr_init( &attr );
         pthread_attr_setdetachstate( &attr, PTHREAD_CREATE_DETACHED );
         SHELL *myshell;
-        CMD_OBJ cmd[2] = {{"test", test, NULL}, {"help", test, NULL}};
+        CMD_OBJ cmd[2] = {{"test", NULL, test, NULL}, {"help", NULL, test, NULL}};
         myshell = create_shell();
         myshell->init( myshell, cmd, get_cmd_len( cmd ), "myshell" );
         pthread_t id1, id2;
