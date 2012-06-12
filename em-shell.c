@@ -33,6 +33,10 @@ static char outfile[CMD_FILENAME_LEN] = { 0 }, infile[CMD_FILENAME_LEN] = {0};
  *
  * *******************************************/
 
+#define EM_SHELL_VERSION 0.1
+#define INNER_CMD_NUMBER 4
+
+
 struct flag {
         int flag_background ;
         int flag_inredirect ;
@@ -59,6 +63,16 @@ struct __SHELL_INTERNAL {
 
 };
 
+struct env {
+        char *home;
+        char *logname;
+        char *path;
+        char cur_dir[PATH_MAX];
+        SHELL_INTERNAL *shell;
+};
+
+/* *********************************************************************** */
+static struct env environment;	    //一个进程共用一个
 const char *path[] = {
         "./", "/bin", "/sbin", "/usr/bin", "/usr/sbin", "/usr/local/bin",
         NULL
@@ -68,6 +82,16 @@ void set_keypress( void );
 void reset_keypress( void );
 void set_nodelay_mode( void );
 void get_window_size( struct winsize * );
+
+///处理环境信息
+void init_env( SHELL_INTERNAL * );
+void clean_env();
+
+///内部命令接口
+static void cmd_cd( CMD_OBJ *cmd, const char *option );
+static void cmd_version( CMD_OBJ *cmd, const char *option );
+static void cmd_help( CMD_OBJ *cmd, const char *option );
+static void cmd_pwd( CMD_OBJ *cmd, const char *option );
 
 void free_patch_buf();
 void show_match_item( unsigned int nfiles );
@@ -90,6 +114,144 @@ struct __SHELL *create_shell();
 void destroy_shell( SHELL * shell );
 static void catch_signal( int i );
 SH_BOOL check_cmd_style( CMD_OBJ cmd[], int n );
+/******************************************************************************/
+
+
+void init_env( SHELL_INTERNAL *this )
+{
+        char *p;
+        p = getenv( "HOME" );
+        environment.home = strdup( p );
+        p = getenv( "LOGNAME" );
+        environment.logname = strdup( p );
+        p = getenv( "PATH" );
+        environment.path = strdup( p );
+        p = getenv( "PWD" );
+        strcat( p, environment.cur_dir );
+        environment.shell = this;
+}
+
+void clean_env()
+{
+        if( environment.home != NULL ) {
+                free( environment.home );
+                environment.home = NULL;
+        }
+
+        if( environment.logname != NULL ) {
+                free( environment.logname );
+                environment.logname = NULL;
+        }
+
+        if( environment.path != NULL ) {
+                free( environment.path );
+                environment.path = NULL;
+        }
+
+        environment.cur_dir[0] = '\0';
+        environment.shell = NULL;
+}
+
+inline int check()
+{
+        static pthread_mutex_t term_lock = PTHREAD_MUTEX_INITIALIZER;
+
+        if( pthread_mutex_trylock( &term_lock ) == 0 )
+                return 0;
+        else
+                return -1;
+}
+
+inline int uncheck()
+{
+        static pthread_mutex_t term_lock = PTHREAD_MUTEX_INITIALIZER;
+        pthread_mutex_unlock( &term_lock );
+        return 0;
+}
+
+
+/* ************** shell自己实现的内部命令 ************* */
+static void cmd_cd( CMD_OBJ *cmd, const char *option )
+{
+        cmd = ( cmd == NULL ) ? NULL : NULL;
+
+        if( option == NULL ) {
+                strcpy( environment.cur_dir, environment.home );
+                chdir( environment.home );
+                setenv( "PWD", environment.home, 1 );
+                return;
+        }
+
+        char buffer[PATH_MAX];
+        struct stat sb;
+
+        switch( *option ) {
+                case '~':
+                        strcpy( buffer, environment.home );
+                        strcat( buffer, option + 1 );
+                        break;
+                case '.':
+                        strcpy( buffer, environment.cur_dir );
+
+                        if( *( option + 1 ) == '/' ) {
+                                strcat( buffer, option + 1 );
+                        } else {
+                                strcat( buffer, "/" );
+                                strcat( buffer, option );
+                        }
+
+                        break;
+                case '/':
+                        strcpy( buffer, option );
+                        break;
+                default:
+                        strcpy( buffer, environment.cur_dir );
+                        strcat( buffer, "/" );
+                        strcat( buffer, option );
+                        break;
+        }
+
+        if( stat( buffer, &sb ) != 0 ) {
+                printf( "current dir is not exist\n" );
+                return;
+        } else {
+                chdir( buffer );
+                setenv( "PWD", buffer, 1 );
+        }
+}
+
+static void cmd_help( CMD_OBJ *cmd, const char *option )
+{
+        cmd = ( cmd == NULL ) ? NULL : NULL;
+        option = ( option == NULL ) ? NULL : NULL;
+        SHELL_INTERNAL *shell = environment.shell;
+        int i = 0;
+
+        while( i < shell->cmdobj_num ) {
+                printf( "%s -- %s\n,", shell->cmdobj[i].CmdStr, shell->cmdobj[i].CmdInfo );
+                ++i;
+        }
+}
+
+static void cmd_version( CMD_OBJ *cmd, const char *option )
+{
+        cmd = ( cmd == NULL ) ? NULL : NULL;
+        option = ( option == NULL ) ? NULL : NULL;
+        printf( "em-shell %f\n", EM_SHELL_VERSION );
+}
+
+static void cmd_pwd( CMD_OBJ *cmd, const char *option )
+{
+        cmd = ( cmd == NULL ) ? NULL : NULL;
+        option = ( option == NULL ) ? NULL : NULL;
+        struct stat buf;
+
+        if( stat( environment.cur_dir, &buf ) != 0 ) {
+                printf( "%s is not exist\n", environment.cur_dir );
+                return;
+        } else
+                printf( "%s\n", environment.cur_dir );
+}
 
 /*-----------------------------------------------------------------------------
  *  这个暂时只支持终端字符集是zh_CN.utf8的情况
@@ -470,9 +632,9 @@ int find_match( SHELL_INTERNAL * this, char *buf , int buf_len )
                                         }
 
                                         /* patch[j] =
-                                                malloc( strlen( ( this->cmdobj + i )->CmdStr ) +
-                                                        1 );
-                                        strcpy( patch[j], ( this->cmdobj + i )->CmdStr ); */
+                                           malloc( strlen( ( this->cmdobj + i )->CmdStr ) +
+                                           1 );
+                                           strcpy( patch[j], ( this->cmdobj + i )->CmdStr ); */
                                         ++j;
                                 }
 
@@ -506,8 +668,8 @@ int find_match( SHELL_INTERNAL * this, char *buf , int buf_len )
                                                 }
 
                                                 /* patch[j] =
-                                                        malloc( strlen( dirp->d_name ) + 1 );
-                                                strcpy( patch[j], dirp->d_name ); */
+                                                   malloc( strlen( dirp->d_name ) + 1 );
+                                                   strcpy( patch[j], dirp->d_name ); */
                                                 ++j;
                                         }
                                 }
@@ -666,7 +828,7 @@ int find_match( SHELL_INTERNAL * this, char *buf , int buf_len )
                                         }
 
                                         /* patch[j++] = malloc( strlen( dirp->d_name ) + 1 );
-                                        strcpy( patch[j - 1], dirp->d_name ); */
+                                           strcpy( patch[j - 1], dirp->d_name ); */
                                         //cnt++;
                                 }
                         }
@@ -741,6 +903,12 @@ END:
 
 struct __SHELL *create_shell() {
         int i;
+
+        if( check() == -1 ) {
+                fprintf( stderr, "程序中只能使用一个shell" );
+                return NULL;
+        }
+
         SHELL_INTERNAL *sh =
                 ( SHELL_INTERNAL * ) malloc( sizeof( struct __SHELL_INTERNAL ) );
 
@@ -788,6 +956,8 @@ struct __SHELL *create_shell() {
         atomic_set( &sh->flag_init, 0 );
         atomic_set( &sh->flag_start, 0 );
         signal( SHELL_STOP_SIGNAL, SIG_IGN );
+
+        init_env( sh );
         return ( SHELL * ) sh;
 }
 
@@ -811,15 +981,26 @@ static SH_BOOL initialise( SHELL * this, CMD_OBJ cmd[], int n, char *prompt )
                 return SH_FALSE;	//已经初始化了 or cmd style is illegal
         }
 
-        shell->cmdobj = ( CMD_OBJ * ) malloc( n * sizeof( CMD_OBJ ) );
+        shell->cmdobj = ( CMD_OBJ * ) malloc( ( n + INNER_CMD_NUMBER ) * sizeof( CMD_OBJ ) );
 
         if( shell->cmdobj == NULL )
                 return SH_FALSE;
 
-        shell->cmdobj_num = n;
+        shell->cmdobj_num = n + INNER_CMD_NUMBER;
 
         while( n-- )
-                *( shell->cmdobj + n ) = *( cmd + n );
+                *( shell->cmdobj + n + INNER_CMD_NUMBER ) = *( cmd + n );
+
+        n = INNER_CMD_NUMBER;
+        CMD_OBJ inner_cmd[INNER_CMD_NUMBER] = {
+                {"help", "help info index", cmd_help, NULL},
+                {"version", "em-shell version info", cmd_version, NULL},
+                {"cd", "change current directory", cmd_cd, NULL},
+                {"pwd", "show current directory path", cmd_pwd, NULL}
+        };
+
+        while( n-- )
+                *( shell->cmdobj + n ) = *( inner_cmd + n );
 
         if( prompt != NULL ) {
                 if( shell->prompt != NULL )
@@ -872,6 +1053,9 @@ void destroy_shell( SHELL * shell )
                 pthread_rwlock_destroy( &this->lock );
                 free( this );
         }
+
+        clean_env();
+        uncheck();
 }
 
 void shell_close( SHELL * shell )
@@ -898,8 +1082,8 @@ static int command( SHELL_INTERNAL * this, char *cmdStr , int cmd_len )
         int redirect_bak[2];
         struct flag cmd_flag = {0,  0,  0,  0,  0,  1};
         /* char *tmp_template = NULL, *tmp_file = NULL;
-        int pipe_layer_var = 0, cnt = 0;
-        int pid, pid2, fd1, fd2*/
+           int pipe_layer_var = 0, cnt = 0;
+           int pid, pid2, fd1, fd2*/
         const char *option;
         char *next, *temp, *tmp, *buf = cmdStr;
         char *inter_ptr = NULL, *outer_ptr = NULL;
@@ -1009,7 +1193,7 @@ static int command( SHELL_INTERNAL * this, char *cmdStr , int cmd_len )
                         if( j == 1 )
                                 option = NULL;	// only contain cmdStr
                         /* else if( *( buf_bak + strlen( argv[0] ) + 1 ) == '-' )
-                                option = buf_bak + strlen( argv[0] ) + 1;	// contain cmd parameter,too */
+                           option = buf_bak + strlen( argv[0] ) + 1;	// contain cmd parameter,too */
                         else {
                                 option = buf_bak + strlen( argv[0] );
 
@@ -1136,8 +1320,8 @@ static void *shell_entry( void *shell )
            perror("setpgid failed"); */
         sigset_t sigmask;
         /*sigemptyset(&sigmask);
-           sigaddset(&sigmask, SHELL_STOP_SIGNAL);
-           pthread_sigmask(SIG_UNBLOCK,&sigmask,NULL); */
+          sigaddset(&sigmask, SHELL_STOP_SIGNAL);
+          pthread_sigmask(SIG_UNBLOCK,&sigmask,NULL); */
         sigfillset( &sigmask );
         sigdelset( &sigmask, SHELL_STOP_SIGNAL );
         pthread_sigmask( SIG_SETMASK, &sigmask, NULL );
@@ -1187,7 +1371,7 @@ static inline void do_command_buf( SHELL_INTERNAL * this, char *buf, int buf_len
                 if( ch == EOF ) {
                         fprintf( stderr, "error : %m [%d]\n", strlen( buf ) );
                         /* reset_keypress();
-                        set_keypress(); */
+                           set_keypress(); */
                         sleep( 1 );
                         continue;
                 }

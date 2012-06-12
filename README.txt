@@ -16,13 +16,15 @@ a shell which can be embedded in software code.
     * 实现内部命令时，尽量不要阻塞，即便遇到加锁之类也应该使用trylock这种判断，如果获取不到琐就返回，因为内部命令没有使用创建新进程去实现，因此会阻塞掉当前shell的流程
     * 系统使用了SIGRTMAX-1，外部程序不应该再使用该信号值
     * 使用的线程读写锁设置了pshared属性，可以用于多线程和多进程
+    * 由于一个程序只能有一个控制前端或终端，因此程序中只允许建立一个shell
+    * 内部已经集成了少量shell内建命令，例如cd，version，help，pwd等
 
 =======
 2. 【使用方法】
 
-    CMD_OBJ cmd[num] = {{"version",handler1, NULL},{...}};
+    CMD_OBJ cmd[num] = {{"version","cmd_info",handler1, NULL},{...}};
     SHELL *sh = create_shell();
-    sh->init(sh,cmd,get_cmd_len(cmd), "CDN_SHELL");
+    sh->init(sh,cmd, get_cmd_len(cmd), "CDN_SHELL");
     sh->start(sh, 1);
     destroy_shell(sh);
 
