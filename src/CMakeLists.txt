@@ -1,4 +1,4 @@
-AUX_SOURCE_DIRECTORY(. SRC_LIST)
+aux_source_directory(. SRC_LIST)
 add_library(emshell ${SRC_LIST})
 
 add_custom_command(TARGET emshell
