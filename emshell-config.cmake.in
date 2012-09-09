@@ -1,0 +1,3 @@
+# you can use find_package(emshell) now
+include_directories(${CMAKE_SOURCE_DIR}/src)
+include("${CMAKE_BINARY_DIR}/emshell-exports.cmake")

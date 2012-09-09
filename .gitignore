@@ -3,3 +3,12 @@ test/test
 example/example
 doc/html/*
 *.swp
+build/*
+*.~
+*.orig
+
+
+CMakeCache.txt
+cmake_install.cmake
+CMakeFiles
+Makefile
